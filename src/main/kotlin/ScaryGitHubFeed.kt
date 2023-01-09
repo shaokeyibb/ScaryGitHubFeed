@@ -25,7 +25,7 @@ val commandPermission = PermissionService.INSTANCE.register(
     description = "Permission of command github-feed"
 )
 
-val githubRepoRegex = Regex("^https://github\\.com/(.+?)/(.+?)(/{1}.+|.{0})\$")
+val githubRepoRegex = Regex("^https://github\\.com/([a-zA-Z0-9\\-]+?)/([a-zA-Z0-9\\-_.]+?)(/.+|.{0})\$")
 
 const val githubGraphLinkPrefix =
     "https://opengraph.githubassets.com/31593820a09d4aa76a2b7f30a7efd993982cb622b3607ab21a852c5397bcdde0/"
