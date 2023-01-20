@@ -14,6 +14,7 @@ import net.mamoe.mirai.message.data.toMessageChain
 import net.mamoe.mirai.utils.ExternalResource
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
 import java.net.URL
+import java.text.SimpleDateFormat
 import java.time.Instant
 import java.util.*
 
@@ -92,6 +93,7 @@ object ScaryGitHubFeed : KotlinPlugin(
                             groupId, (PlainText(buildString {
                                 appendLine("GitHub Feed 订阅推送 \uD83D\uDE31\uD83D\uDE31\uD83D\uDE31\uD83D\uDE31\uD83D\uDE31")
                                 appendLine(entry.title)
+                                appendLine("时间：" + SimpleDateFormat.getDateTimeInstance().format(entry.publishedDate))
                             }) + (uploadImage(
                                 groupId,
                                 async {
