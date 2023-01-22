@@ -1,6 +1,8 @@
 package io.hikarilan
 
 import kotlinx.coroutines.*
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.*
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.console.command.CommandManager
 import net.mamoe.mirai.console.permission.PermissionId
@@ -30,6 +32,9 @@ val githubRepoRegex = Regex("^https://github\\.com/([a-zA-Z0-9\\-]+?)/([a-zA-Z0-
 
 const val githubGraphLinkPrefix =
     "https://opengraph.githubassets.com/31593820a09d4aa76a2b7f30a7efd993982cb622b3607ab21a852c5397bcdde0/"
+
+val githubCompareRegex =
+    Regex("^https://github\\.com/([a-zA-Z0-9\\-]+?)/([a-zA-Z0-9\\-_.]+?)/compare/([a-z0-9]{10})...([a-z0-9]{10})\$")
 
 object ScaryGitHubFeed : KotlinPlugin(
     JvmPluginDescription(
@@ -81,6 +86,7 @@ object ScaryGitHubFeed : KotlinPlugin(
         }
     }
 
+    @OptIn(ExperimentalSerializationApi::class)
     private suspend fun postSubscribeMessage(groupId: Long, githubId: String) {
         val feed = getFeed(githubId)
         if (feed.publishedDate.time > (Data.lastUpdatedTime[githubId] ?: Date.from(Instant.now()).time)) {
@@ -105,6 +111,30 @@ object ScaryGitHubFeed : KotlinPlugin(
                                 ?: PlainText("无法加载图片").toMessageChain()
                                     )).toMessageChain() + PlainText(buildString {
                                 appendLine(entry.link)
+                                appendLine("----------")
+                                async {
+                                    withContext(Dispatchers.IO) {
+                                        githubCompareRegex.find(entry.link)?.groupValues?.let { (_, owner, repo, from, to) ->
+                                            URL("https://api.github.com/repos/$owner/$repo/compare/$from...$to").openStream()
+                                        }
+                                    }
+                                }.await()?.use {
+                                    for (json in Json.decodeFromStream<JsonObject>(it)["commits"]?.jsonArray
+                                        ?: return@use) {
+                                        val commit = json.jsonObject["commit"] ?: continue
+                                        val message = commit.jsonObject["message"] ?: continue
+                                        val author = commit.jsonObject["author"] ?: continue
+                                        val date = author.jsonObject["date"] ?: continue
+                                        val name = author.jsonObject["name"] ?: continue
+                                        appendLine(
+                                            "- " + message.jsonPrimitive.content
+                                                    + " on " + SimpleDateFormat.getDateTimeInstance()
+                                                .format(date.jsonPrimitive.content)
+                                                    + " by " + name.jsonPrimitive.content
+                                        )
+                                        appendLine("----------")
+                                    }
+                                }
                                 appendLine("----------")
                                 append("from ScaryGitHubFeed")
                             })
