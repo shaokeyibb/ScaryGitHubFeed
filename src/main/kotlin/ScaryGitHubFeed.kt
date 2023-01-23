@@ -125,9 +125,9 @@ object ScaryGitHubFeed : KotlinPlugin(
                                     for (json in Json.decodeFromStream<JsonObject>(it)["commits"]?.jsonArray
                                         ?: return@use) {
                                         val sha = json.jsonObject["sha"]?.jsonPrimitive?.content ?: continue
-                                        val commit = json.jsonObject["commit"] ?: continue
+                                        val commit = json.jsonObject["commit"]?.jsonArray ?: continue
                                         val message = commit.jsonObject["message"]?.jsonPrimitive?.content ?: continue
-                                        val author = commit.jsonObject["author"] ?: continue
+                                        val author = commit.jsonObject["author"]?.jsonObject ?: continue
                                         val date = author.jsonObject["date"]?.jsonPrimitive?.content ?: continue
                                         val name = author.jsonObject["name"]?.jsonPrimitive?.content ?: continue
                                         appendLine(
@@ -136,7 +136,6 @@ object ScaryGitHubFeed : KotlinPlugin(
                                                     + " (" + "on " + LocalDateTime.from(DateTimeFormatter.ISO_INSTANT.parse(date)).format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM))
                                                     + " by " + name + ")"
                                         )
-                                        appendLine("----------")
                                     }
                                 }
                                 appendLine("----------")
