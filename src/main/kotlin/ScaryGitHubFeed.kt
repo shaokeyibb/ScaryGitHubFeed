@@ -83,6 +83,7 @@ object ScaryGitHubFeed : KotlinPlugin(
                         PlainText("无法订阅 $id 的 GitHub Feed，因为指定 Feed 解析失败").toMessageChain()
                     )
                     logger.error("Failed to get feed of $id for group $groupId")
+                    e.printStackTrace()
                     return
                 }
             }
@@ -136,7 +137,11 @@ object ScaryGitHubFeed : KotlinPlugin(
                                         appendLine(
                                             "- commit#" + sha.substring(sha.length - 6, sha.length) + ": "
                                                     + message
-                                                    + " (" + "on " + LocalDateTime.from(DateTimeFormatter.ISO_INSTANT.parse(date)).format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM))
+                                                    + " (" + "on " + LocalDateTime.from(
+                                                DateTimeFormatter.ISO_INSTANT.parse(
+                                                    date
+                                                )
+                                            ).format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM))
                                                     + " by " + name + ")"
                                         )
                                     }
