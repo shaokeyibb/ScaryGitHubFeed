@@ -115,6 +115,8 @@ object ScaryGitHubFeed : KotlinPlugin(
                                     )).toMessageChain() + PlainText(buildString {
                                 appendLine(entry.link)
                                 async {
+                                    println(entry.link)
+                                    println(githubCompareRegex.find(entry.link)?.groupValues)
                                     withContext(Dispatchers.IO) {
                                         githubCompareRegex.find(entry.link)?.groupValues?.let { (_, owner, repo, from, to) ->
                                             URL("https://api.github.com/repos/$owner/$repo/compare/$from...$to").openStream()
@@ -122,6 +124,7 @@ object ScaryGitHubFeed : KotlinPlugin(
                                     }
                                 }.await()?.use {
                                     appendLine("----------")
+                                    println(it)
                                     for (json in Json.decodeFromStream<JsonObject>(it)["commits"]?.jsonArray
                                         ?: return@use) {
                                         val sha = json.jsonObject["sha"]?.jsonPrimitive?.content ?: continue
