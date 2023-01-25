@@ -18,9 +18,6 @@ import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
 import java.net.URL
 import java.text.SimpleDateFormat
 import java.time.Instant
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
 import java.util.*
 
 val commandPermission = PermissionService.INSTANCE.register(
@@ -114,6 +111,7 @@ object ScaryGitHubFeed : KotlinPlugin(
                                 ?: PlainText("无法加载图片").toMessageChain()
                                     )).toMessageChain() + PlainText(buildString {
                                 appendLine(entry.link)
+                                appendLine("----------")
                                 async {
                                     withContext(Dispatchers.IO) {
                                         githubCompareRegex.find(entry.link)?.groupValues?.let { (_, owner, repo, from, to) ->
@@ -121,20 +119,18 @@ object ScaryGitHubFeed : KotlinPlugin(
                                         }
                                     }
                                 }.await()?.use {
-                                    appendLine("----------")
                                     for (json in Json.decodeFromStream<JsonObject>(it)["commits"]?.jsonArray
                                         ?: return@use) {
-                                        val sha = json.jsonObject["sha"]?.jsonPrimitive?.content ?: continue
                                         val commit = json.jsonObject["commit"] ?: continue
-                                        val message = commit.jsonObject["message"]?.jsonPrimitive?.content ?: continue
+                                        val message = commit.jsonObject["message"] ?: continue
                                         val author = commit.jsonObject["author"] ?: continue
-                                        val date = author.jsonObject["date"]?.jsonPrimitive?.content ?: continue
-                                        val name = author.jsonObject["name"]?.jsonPrimitive?.content ?: continue
+                                        val date = author.jsonObject["date"] ?: continue
+                                        val name = author.jsonObject["name"] ?: continue
                                         appendLine(
-                                            "- commit#" + sha.substring(sha.length - 6, sha.length) + ": "
-                                                    + message
-                                                    + " (" + "on " + LocalDateTime.from(DateTimeFormatter.ISO_INSTANT.parse(date)).format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM))
-                                                    + " by " + name + ")"
+                                            "- " + message.jsonPrimitive.content
+                                                    + " on " + SimpleDateFormat.getDateTimeInstance()
+                                                .format(date.jsonPrimitive.content)
+                                                    + " by " + name.jsonPrimitive.content
                                         )
                                         appendLine("----------")
                                     }
