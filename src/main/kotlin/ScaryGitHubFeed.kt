@@ -209,6 +209,7 @@ object ScaryGitHubFeed : KotlinPlugin(
                                 + message
                                 + " (" + "on " + ZonedDateTime
                             .parse(date, DateTimeFormatter.ISO_DATE_TIME)
+                            .withZoneSameInstant(ZoneId.systemDefault())
                             .format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM))
                                 + " by " + name + ")"
                     )
