@@ -214,6 +214,7 @@ object ScaryGitHubFeed : KotlinPlugin(
                                 + " by " + name + ")"
                     )
                 }
+                appendLine("----------")
             }
         }?.let { messageChain.add(it) }
 
