@@ -178,9 +178,7 @@ object ScaryGitHubFeed : KotlinPlugin(
     ) {
 
         val imageResource = async {
-            image?.use { bot.uploadImage(groupId, it) }?.also {
-                logger.error("Failed to upload image for group $groupId")
-            }
+            image?.use { bot.uploadImage(groupId, it) }
         }
         val commitsResource = async {
             commits?.use { res ->
