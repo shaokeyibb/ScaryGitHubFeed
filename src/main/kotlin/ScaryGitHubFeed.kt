@@ -145,10 +145,12 @@ object ScaryGitHubFeed : KotlinPlugin(
                     append("from ScaryGitHubFeed")
                 }
             }
+        logger.info("Built ${messageChains.size} message chains for entries.")
 
+        logger.info("Starting to post messages...")
         for ((botId, botData) in Data.feedData) {
+            val bot = Bot.getInstanceOrNull(botId) ?: continue
             for ((groupId, githubIds) in botData) {
-                val bot = Bot.getInstanceOrNull(botId) ?: continue
                 for (githubId in githubIds) {
                     val entries = feeds[githubId] ?: continue
                     logger.info("Posting entries for user $githubId in group $groupId by bot $botId")
@@ -171,6 +173,7 @@ object ScaryGitHubFeed : KotlinPlugin(
                 }
             }
         }
+        logger.info("Finished posting subscribe message for all feeds")
     }
 
     @OptIn(ExperimentalSerializationApi::class)
