@@ -41,7 +41,7 @@ val githubCompareRegex =
 
 const val githubAPIEndpoint = "https://api.github.com/repos/"
 
-val proxy = if (Config.proxyHost.isNotBlank() && Config.proxyPort > 0) {
+val proxy: Proxy = if (Config.proxyHost.isNotBlank() && Config.proxyPort > 0) {
     Proxy(Proxy.Type.SOCKS, InetSocketAddress(Config.proxyHost, Config.proxyPort))
 } else Proxy.NO_PROXY
 
@@ -229,7 +229,7 @@ object ScaryGitHubFeed : KotlinPlugin(
     private fun requireFeed(githubId: String): List<SyndEntry>? {
         logger.info("Require feed from $githubId")
         return try {
-            val feed = getFeed(githubId)
+            val feed = getFeed(githubId, proxy)
             val lastUpdatedTime = Data.lastUpdatedTime.getOrPut(githubId) { Date.from(Instant.now()).time }
             feed.entries.filter { it.publishedDate.time > lastUpdatedTime }
                 .also { logger.info("Got ${it.size} entries for $githubId") }

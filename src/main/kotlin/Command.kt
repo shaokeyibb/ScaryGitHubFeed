@@ -20,7 +20,7 @@ object Command : CompositeCommand(
             context.sendMessage("已经订阅过 $githubId 的 GitHub Feed")
             return
         }
-        if (ScaryGitHubFeed.async { checkFeedValid(githubId) }.await()) {
+        if (ScaryGitHubFeed.async { checkFeedValid(githubId, proxy) }.await()) {
             ScaryGitHubFeed.logger.info("Subscribed $githubId for group ${context.subject!!.id} by bot ${context.bot!!.id}")
             context.subject?.sendMessage("已成功为 $githubId 添加 GitHub Feed 订阅")
             Data.feedData.getOrPut(context.bot!!.id) { mutableMapOf() }
