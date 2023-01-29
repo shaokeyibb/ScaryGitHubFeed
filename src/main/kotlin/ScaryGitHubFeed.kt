@@ -158,9 +158,10 @@ object ScaryGitHubFeed : KotlinPlugin(
                             commits
                         )
                     }
-                    Data.lastUpdatedTime[githubId] = (feeds[githubId]?.maxOf { it.publishedDate.time } ?: Date.from(Instant.now()).time).also {
-                        logger.info("Update last updated time for user $githubId from ${Data.lastUpdatedTime[githubId]} to $it")
-                    }
+                    Data.lastUpdatedTime[githubId] =
+                        (feeds[githubId]?.maxOf { it.publishedDate.time } ?: Date.from(Instant.now()).time).also {
+                            logger.info("Update last updated time for user $githubId from ${Data.lastUpdatedTime[githubId]} to $it")
+                        }
                 }
             }
         }
@@ -175,12 +176,14 @@ object ScaryGitHubFeed : KotlinPlugin(
         commits: ExternalResource? = null
     ) {
         val imageResource = async {
-            image?.let { bot.uploadImage(groupId, it) }?.also {
+            image?.use { bot.uploadImage(groupId, it) }?.also {
                 logger.error("Failed to upload image for group $groupId")
             }
         }
         val commitsResource = async {
-            commits?.inputStream()?.use { Json.decodeFromStream<JsonObject>(it)["commits"]?.jsonArray }
+            commits?.use { res ->
+                res.inputStream().use { Json.decodeFromStream<JsonObject>(it)["commits"]?.jsonArray }
+            }
         }
 
         messageChainBuilder[3] = imageResource.await() ?: PlainText("无法加载图片")
