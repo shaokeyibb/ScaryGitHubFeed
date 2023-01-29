@@ -2,6 +2,7 @@ package io.hikarilan
 
 import com.rometools.rome.feed.synd.SyndEntry
 import kotlinx.coroutines.*
+import kotlinx.coroutines.time.withTimeout
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.*
 import net.mamoe.mirai.Bot
@@ -16,6 +17,7 @@ import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
 import net.mamoe.mirai.utils.info
 import java.net.URL
 import java.text.SimpleDateFormat
+import java.time.Duration
 import java.time.Instant
 import java.util.*
 
@@ -57,8 +59,16 @@ object ScaryGitHubFeed : KotlinPlugin(
 
         postJob = launch {
             while (true) {
-                postAllSubscribeMessage()
-                delay(Config.postDelaySec)
+                try {
+                    withTimeout(Duration.ofSeconds(Config.postTimeoutSec)) {
+                        postAllSubscribeMessage()
+                    }
+                } catch (e: TimeoutCancellationException) {
+                    logger.error("Post timeout")
+                } catch (e: Exception) {
+                    logger.error("Post error", e)
+                }
+                kotlinx.coroutines.time.delay(Duration.ofSeconds(Config.postDelaySec))
             }
         }
 
