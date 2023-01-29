@@ -128,10 +128,7 @@ object ScaryGitHubFeed : KotlinPlugin(
             .associateWith { entry ->
                 val matches = githubCompareRegex.find(entry.link)?.groupValues?.let { (_, owner, repo, from, to) ->
                     "$githubAPIEndpoint$owner/$repo/compare/$from...$to"
-                } ?: return@associateWith let {
-                    logger.error("Failed to build commits resource for ${entry.link} because of regex failed")
-                    null
-                }
+                } ?: return@associateWith null
                 async { requireResource(URL(matches)) }
             }
             .mapValues { it.value?.await() }
