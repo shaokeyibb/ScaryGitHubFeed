@@ -199,6 +199,7 @@ object ScaryGitHubFeed : KotlinPlugin(
 
         commitsResource.await()?.let { commitJson ->
             buildMessageChain {
+                appendLine("commit 信息：")
                 for (json in commitJson) {
                     val sha = json.jsonObject["sha"]?.jsonPrimitive?.content ?: continue
                     val commit = json.jsonObject["commit"] ?: continue
@@ -213,7 +214,6 @@ object ScaryGitHubFeed : KotlinPlugin(
                             .format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM))
                                 + " by " + name + ")"
                     )
-                    appendLine("----------")
                 }
             }
         }?.let { messageChain.add(it) }
