@@ -15,6 +15,8 @@ import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.utils.ExternalResource
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
 import net.mamoe.mirai.utils.info
+import java.net.InetSocketAddress
+import java.net.Proxy
 import java.net.URL
 import java.text.SimpleDateFormat
 import java.time.Duration
@@ -38,6 +40,10 @@ val githubCompareRegex =
     Regex("^https://github\\.com/([a-zA-Z0-9\\-]+?)/([a-zA-Z0-9\\-_.]+?)/compare/([a-z0-9]{10})...([a-z0-9]{10})\$")
 
 const val githubAPIEndpoint = "https://api.github.com/repos/"
+
+val proxy = if (Config.proxyHost.isNotBlank() && Config.proxyPort > 0) {
+    Proxy(Proxy.Type.SOCKS, InetSocketAddress(Config.proxyHost, Config.proxyPort))
+} else Proxy.NO_PROXY
 
 object ScaryGitHubFeed : KotlinPlugin(
     JvmPluginDescription(
@@ -175,6 +181,10 @@ object ScaryGitHubFeed : KotlinPlugin(
         image: ExternalResource? = null,
         commits: ExternalResource? = null
     ) {
+
+        // flush message chain builder cache so that we can edit the mutable list inner it
+        MessageChainBuilder::class.java.getDeclaredMethod("flushCache").invoke(messageChainBuilder)
+
         val imageResource = async {
             image?.use { bot.uploadImage(groupId, it) }?.also {
                 logger.error("Failed to upload image for group $groupId")
@@ -238,7 +248,7 @@ object ScaryGitHubFeed : KotlinPlugin(
         logger.info("Require resource from $url")
         return try {
             withContext(Dispatchers.IO) {
-                url.openStream().use { it.toExternalResource() }.also {
+                url.openConnection(proxy).getInputStream().use { it.toExternalResource() }.also {
                     logger.info { "Resource loaded from $url" }
                 }
             }

@@ -9,4 +9,8 @@ object Config : AutoSavePluginConfig("Config") {
 
     val postTimeoutSec: Long by value(5 * 60L)
 
+    val proxyHost: String by value("")
+
+    val proxyPort: Int by value(0)
+
 }
