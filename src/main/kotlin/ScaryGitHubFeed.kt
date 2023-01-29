@@ -165,6 +165,10 @@ object ScaryGitHubFeed : KotlinPlugin(
             }
         }
         logger.info("Finished posting subscribe message for all feeds")
+
+        // Cleanup
+        imageResources.values.forEach { it.close() }
+        commitsResource.values.forEach { it.close() }
     }
 
     @OptIn(ExperimentalSerializationApi::class)
