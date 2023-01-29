@@ -153,6 +153,9 @@ object ScaryGitHubFeed : KotlinPlugin(
                             commits
                         )
                     }
+                    val latest = feeds[githubId]?.maxOf { it.publishedDate.time } ?: Date.from(Instant.now()).time
+                    logger.info("Update last updated time for user $githubId from ${Data.lastUpdatedTime[githubId]} to $latest")
+                    Data.lastUpdatedTime[githubId] = latest
                 }
             }
         }
