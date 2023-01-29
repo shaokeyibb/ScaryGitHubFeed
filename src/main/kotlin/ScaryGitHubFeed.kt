@@ -209,7 +209,7 @@ object ScaryGitHubFeed : KotlinPlugin(
                     appendLine(
                         "- commit#" + sha.substring(sha.length - 6, sha.length) + ": "
                                 + message
-                                + " (" + "on " + LocalDateTime.parse(date, DateTimeFormatter.ISO_INSTANT)
+                                + " (" + "on " + LocalDateTime.parse(date, DateTimeFormatter.ISO_DATE_TIME)
                             .format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM))
                                 + " by " + name + ")"
                     )
