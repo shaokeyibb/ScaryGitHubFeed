@@ -84,11 +84,15 @@ object ScaryGitHubFeed : KotlinPlugin(
 
     private suspend fun postAllSubscribeMessage() {
         logger.info("Posting subscribe message for all feeds")
+
         val feeds = Data.feedData
             .flatMap { it.value.values }.flatten()
             .associateWith { async { requireFeed(it) }.await() }
+            .mapNotNull { (k, v) -> v?.let { k to it } }
+            .toMap()
             .filter { it.value.isNotEmpty() }
         logger.info("Got ${feeds.size} feeds for following users: ${feeds.keys.joinToString()}")
+
         val imageResources = feeds.values.asSequence().flatten()
             .associateWith { entry ->
                 val matches =
@@ -102,6 +106,7 @@ object ScaryGitHubFeed : KotlinPlugin(
             .mapNotNull { (k, v) -> v?.let { k to it } }
             .toMap()
         logger.info("Got ${imageResources.size} image resources for entries.")
+
         val commitsResource = feeds.values.flatten()
             .associateWith { entry ->
                 val matches = githubCompareRegex.find(entry.link)?.groupValues?.let { (_, owner, repo, from, to) ->
@@ -115,6 +120,7 @@ object ScaryGitHubFeed : KotlinPlugin(
             .mapNotNull { (k, v) -> v?.let { k to it } }
             .toMap()
         logger.info("Got ${commitsResource.size} commits resources for entries.")
+
         val messageChains = feeds.values.flatten()
             .associateWith { entry ->
                 MessageChainBuilder().apply {
@@ -128,6 +134,7 @@ object ScaryGitHubFeed : KotlinPlugin(
                     append("from ScaryGitHubFeed")
                 }
             }
+
         for ((botId, botData) in Data.feedData) {
             for ((groupId, githubIds) in botData) {
                 val bot = Bot.getInstanceOrNull(botId) ?: continue
@@ -167,6 +174,7 @@ object ScaryGitHubFeed : KotlinPlugin(
         val commitsResource = async {
             commits?.inputStream()?.use { Json.decodeFromStream<JsonObject>(it)["commits"]?.jsonArray }
         }
+
         messageChainBuilder[3] = imageResource.await() ?: PlainText("无法加载图片")
         commitsResource.await()?.let { commitJson ->
             buildMessageChain {
@@ -190,13 +198,20 @@ object ScaryGitHubFeed : KotlinPlugin(
         }?.also {
             messageChainBuilder.removeAt(6)
         }
+
         bot.sendMessage(groupId, messageChainBuilder.build())
     }
 
-    private fun requireFeed(githubId: String): List<SyndEntry> {
-        val feed = getFeed(githubId)
-        val lastUpdatedTime = Data.lastUpdatedTime.getOrPut(githubId) { Date.from(Instant.now()).time }
-        return feed.entries.filter { it.publishedDate.time > lastUpdatedTime }
+    private fun requireFeed(githubId: String): List<SyndEntry>? {
+        logger.info("Require feed from $githubId")
+        return try {
+            val feed = getFeed(githubId)
+            val lastUpdatedTime = Data.lastUpdatedTime.getOrPut(githubId) { Date.from(Instant.now()).time }
+            feed.entries.filter { it.publishedDate.time > lastUpdatedTime }
+        } catch (e: Exception) {
+            logger.error("Failed to get feed for $githubId", e)
+            null
+        }
     }
 
     private suspend fun Bot.sendMessage(groupId: Long, message: MessageChain) {
@@ -207,12 +222,17 @@ object ScaryGitHubFeed : KotlinPlugin(
         return resource.use { getGroup(groupId)?.uploadImage(it) }
     }
 
-    private suspend fun requireResource(url: URL): ExternalResource {
+    private suspend fun requireResource(url: URL): ExternalResource? {
         logger.info("Require resource from $url")
-        return withContext(Dispatchers.IO) {
-            url.openStream().use { it.toExternalResource() }.also {
-                logger.info { "Resource loaded from $url" }
+        return try {
+            withContext(Dispatchers.IO) {
+                url.openStream().use { it.toExternalResource() }.also {
+                    logger.info { "Resource loaded from $url" }
+                }
             }
+        } catch (e: Exception) {
+            logger.error("Failed to load resource for $url", e)
+            null
         }
     }
 
