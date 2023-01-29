@@ -21,6 +21,9 @@ import java.net.URL
 import java.text.SimpleDateFormat
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.*
 
 val commandPermission = PermissionService.INSTANCE.register(
@@ -197,16 +200,18 @@ object ScaryGitHubFeed : KotlinPlugin(
         commitsResource.await()?.let { commitJson ->
             buildMessageChain {
                 for (json in commitJson) {
+                    val sha = json.jsonObject["sha"]?.jsonPrimitive?.content ?: continue
                     val commit = json.jsonObject["commit"] ?: continue
-                    val message = commit.jsonObject["message"] ?: continue
+                    val message = commit.jsonObject["message"]?.jsonPrimitive?.content ?: continue
                     val author = commit.jsonObject["author"] ?: continue
-                    val date = author.jsonObject["date"] ?: continue
-                    val name = author.jsonObject["name"] ?: continue
+                    val date = author.jsonObject["date"]?.jsonPrimitive?.content ?: continue
+                    val name = author.jsonObject["name"]?.jsonPrimitive?.content ?: continue
                     appendLine(
-                        "- " + message.jsonPrimitive.content
-                                + " on " + SimpleDateFormat.getDateTimeInstance()
-                            .format(date.jsonPrimitive.content)
-                                + " by " + name.jsonPrimitive.content
+                        "- commit#" + sha.substring(sha.length - 6, sha.length) + ": "
+                                + message
+                                + " (" + "on " + LocalDateTime.parse(date, DateTimeFormatter.ISO_INSTANT)
+                            .format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM))
+                                + " by " + name + ")"
                     )
                     appendLine("----------")
                 }
