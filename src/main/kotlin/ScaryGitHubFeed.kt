@@ -65,6 +65,8 @@ object ScaryGitHubFeed : KotlinPlugin(
                     }
                 } catch (e: TimeoutCancellationException) {
                     logger.error("Post timeout")
+                } catch (e: CancellationException) {
+                    logger.info("Post cancelled")
                 } catch (e: Exception) {
                     logger.error("Post error", e)
                 }
@@ -87,7 +89,8 @@ object ScaryGitHubFeed : KotlinPlugin(
 
         val feeds = Data.feedData
             .flatMap { it.value.values }.flatten()
-            .associateWith { async { requireFeed(it) }.await() }
+            .associateWith { async { requireFeed(it) } }
+            .mapValues { it.value.await() }
             .mapNotNull { (k, v) -> v?.let { k to it } }
             .toMap()
             .filter { it.value.isNotEmpty() }
@@ -101,8 +104,9 @@ object ScaryGitHubFeed : KotlinPlugin(
                             logger.error("Failed to build repo image resource for ${entry.link} because of regex failed")
                             null
                         }
-                async { requireResource(URL(githubGraphLinkPrefix + matches)) }.await()
+                async { requireResource(URL(githubGraphLinkPrefix + matches)) }
             }
+            .mapValues { it.value?.await() }
             .mapNotNull { (k, v) -> v?.let { k to it } }
             .toMap()
         logger.info("Got ${imageResources.size} image resources for entries.")
@@ -115,8 +119,9 @@ object ScaryGitHubFeed : KotlinPlugin(
                     logger.error("Failed to build commits resource for ${entry.link} because of regex failed")
                     null
                 }
-                async { requireResource(URL(matches)) }.await()
+                async { requireResource(URL(matches)) }
             }
+            .mapValues { it.value?.await() }
             .mapNotNull { (k, v) -> v?.let { k to it } }
             .toMap()
         logger.info("Got ${commitsResource.size} commits resources for entries.")
@@ -153,9 +158,9 @@ object ScaryGitHubFeed : KotlinPlugin(
                             commits
                         )
                     }
-                    val latest = feeds[githubId]?.maxOf { it.publishedDate.time } ?: Date.from(Instant.now()).time
-                    logger.info("Update last updated time for user $githubId from ${Data.lastUpdatedTime[githubId]} to $latest")
-                    Data.lastUpdatedTime[githubId] = latest
+                    Data.lastUpdatedTime[githubId] = (feeds[githubId]?.maxOf { it.publishedDate.time } ?: Date.from(Instant.now()).time).also {
+                        logger.info("Update last updated time for user $githubId from ${Data.lastUpdatedTime[githubId]} to $it")
+                    }
                 }
             }
         }
@@ -211,6 +216,7 @@ object ScaryGitHubFeed : KotlinPlugin(
             val feed = getFeed(githubId)
             val lastUpdatedTime = Data.lastUpdatedTime.getOrPut(githubId) { Date.from(Instant.now()).time }
             feed.entries.filter { it.publishedDate.time > lastUpdatedTime }
+                .also { logger.info("Got ${it.size} entries for $githubId") }
         } catch (e: Exception) {
             logger.error("Failed to get feed for $githubId", e)
             null
