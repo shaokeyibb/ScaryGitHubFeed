@@ -19,10 +19,7 @@ import java.net.InetSocketAddress
 import java.net.Proxy
 import java.net.URL
 import java.text.SimpleDateFormat
-import java.time.Duration
-import java.time.Instant
-import java.time.LocalDateTime
-import java.time.ZoneOffset
+import java.time.*
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.*
@@ -210,9 +207,8 @@ object ScaryGitHubFeed : KotlinPlugin(
                     appendLine(
                         "- commit#" + sha.substring(sha.length - 6, sha.length) + ": "
                                 + message
-                                + " (" + "on " + LocalDateTime
+                                + " (" + "on " + ZonedDateTime
                             .parse(date, DateTimeFormatter.ISO_DATE_TIME)
-                            .atOffset(ZoneOffset.of(ZoneOffset.systemDefault().id))
                             .format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM))
                                 + " by " + name + ")"
                     )
