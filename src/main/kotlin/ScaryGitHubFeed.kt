@@ -64,19 +64,23 @@ object ScaryGitHubFeed : KotlinPlugin(
         CommandManager.registerCommand(Command)
 
         postJob = launch {
-            while (true) {
-                try {
-                    withTimeout(Duration.ofSeconds(Config.postTimeoutSec)) {
-                        postAllSubscribeMessage()
+            try {
+                while (true) {
+                    try {
+                        withTimeout(Duration.ofSeconds(Config.postTimeoutSec)) {
+                            postAllSubscribeMessage()
+                        }
+                        kotlinx.coroutines.time.delay(Duration.ofSeconds(Config.postDelaySec))
+                    } catch (e: TimeoutCancellationException) {
+                        logger.error("Post timeout")
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        logger.error("Post error", e)
                     }
-                } catch (e: TimeoutCancellationException) {
-                    logger.error("Post timeout")
-                } catch (e: CancellationException) {
-                    logger.info("Post cancelled")
-                } catch (e: Exception) {
-                    logger.error("Post error", e)
                 }
-                kotlinx.coroutines.time.delay(Duration.ofSeconds(Config.postDelaySec))
+            } catch (e: CancellationException) {
+                logger.info("Post cancelled")
             }
         }
 
