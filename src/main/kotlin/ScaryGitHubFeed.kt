@@ -136,21 +136,6 @@ object ScaryGitHubFeed : KotlinPlugin(
             .toMap()
         logger.info("Got ${commitsResource.size} commits resources for entries.")
 
-        val messageChains = feeds.values.flatten()
-            .associateWith { entry ->
-                MessageChainBuilder().apply {
-                    appendLine("GitHub Feed 订阅推送 \uD83D\uDE31\uD83D\uDE31\uD83D\uDE31\uD83D\uDE31\uD83D\uDE31")
-                    appendLine(entry.title)
-                    appendLine("时间：" + SimpleDateFormat.getDateTimeInstance().format(entry.publishedDate))
-                    appendLine("### Repo Image Here (Placeholder with index 3) ###")
-                    appendLine(entry.link)
-                    appendLine("----------")
-                    appendLine("### Commits Here (Placeholder with index 6) ###")
-                    append("from ScaryGitHubFeed")
-                }
-            }
-        logger.info("Built ${messageChains.size} message chains for entries.")
-
         logger.info("Starting to post messages...")
         for ((botId, botData) in Data.feedData) {
             val bot = Bot.getInstanceOrNull(botId) ?: continue
@@ -159,13 +144,12 @@ object ScaryGitHubFeed : KotlinPlugin(
                     val entries = feeds[githubId] ?: continue
                     logger.info("Posting entries for user $githubId in group $groupId by bot $botId")
                     for (entry in entries) {
-                        val messageChain = messageChains[entry] ?: continue
                         val image = imageResources[entry]
                         val commits = commitsResource[entry]
                         postSubscribeMessage(
                             bot,
                             groupId,
-                            messageChain,
+                            entry,
                             image,
                             commits
                         )
@@ -184,13 +168,10 @@ object ScaryGitHubFeed : KotlinPlugin(
     private suspend fun postSubscribeMessage(
         bot: Bot,
         groupId: Long,
-        messageChainBuilder: MessageChainBuilder,
+        entry: SyndEntry,
         image: ExternalResource? = null,
         commits: ExternalResource? = null
     ) {
-
-        // flush message chain builder cache so that we can edit the mutable list inner it
-        MessageChainBuilder::class.java.getDeclaredMethod("flushCache").invoke(messageChainBuilder)
 
         val imageResource = async {
             image?.use { bot.uploadImage(groupId, it) }?.also {
@@ -203,7 +184,16 @@ object ScaryGitHubFeed : KotlinPlugin(
             }
         }
 
-        messageChainBuilder[3] = imageResource.await() ?: PlainText("无法加载图片")
+        val messageChain = MessageChainBuilder().apply {
+            appendLine("GitHub Feed 订阅推送 \uD83D\uDE31\uD83D\uDE31\uD83D\uDE31\uD83D\uDE31\uD83D\uDE31")
+            appendLine(entry.title)
+            appendLine("时间：" + SimpleDateFormat.getDateTimeInstance().format(entry.publishedDate))
+        }
+
+        messageChain.add(imageResource.await() ?: PlainText("无法加载图片"))
+        messageChain.appendLine(entry.link)
+        messageChain.appendLine("----------")
+
         commitsResource.await()?.let { commitJson ->
             buildMessageChain {
                 for (json in commitJson) {
@@ -221,13 +211,11 @@ object ScaryGitHubFeed : KotlinPlugin(
                     appendLine("----------")
                 }
             }
-        }?.forEach {
-            messageChainBuilder.add(6, it)
-        }?.also {
-            messageChainBuilder.removeAt(6)
-        }
+        }?.let { messageChain.add(it) }
 
-        bot.sendMessage(groupId, messageChainBuilder.build())
+        messageChain.append("from ScaryGitHubFeed")
+
+        bot.sendMessage(groupId, messageChain.build())
     }
 
     private fun requireFeed(githubId: String): List<SyndEntry>? {
