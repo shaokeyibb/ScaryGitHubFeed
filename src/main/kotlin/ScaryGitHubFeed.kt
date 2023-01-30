@@ -39,6 +39,11 @@ const val githubGraphLinkPrefix =
 val githubCompareRegex =
     Regex("^https://github\\.com/([a-zA-Z0-9\\-]+?)/([a-zA-Z0-9\\-_.]+?)/compare/([a-z0-9]{10})...([a-z0-9]{10})\$")
 
+val githubIssueRegex = Regex("^https://github\\.com/([a-zA-Z0-9\\-]+?)/([a-zA-Z0-9\\-_.]+?)/issues/(\\d+)\$")
+
+val githubIssueCommentRegex =
+    Regex("^https://github\\.com/([a-zA-Z0-9\\-]+?)/([a-zA-Z0-9\\-_.]+?)/issues/\\d+#issuecomment-(\\d+)\$")
+
 const val githubAPIEndpoint = "https://api.github.com/repos/"
 
 val proxy: Proxy = if (Config.proxyHost.isNotBlank() && Config.proxyPort > 0) {
@@ -139,6 +144,30 @@ object ScaryGitHubFeed : KotlinPlugin(
             .toMap()
         logger.debug("Got ${commitsResource.size} commits resources for entries.")
 
+        val issueResource = feeds.values.flatten()
+            .associateWith { entry ->
+                val matches = githubIssueRegex.find(entry.link)?.groupValues?.let { (_, owner, repo, issue) ->
+                    "$githubAPIEndpoint$owner/$repo/issues/$issue"
+                } ?: return@associateWith null
+                async { requireResource(URL(matches)) }
+            }
+            .mapValues { it.value?.await() }
+            .mapNotNull { (k, v) -> v?.let { k to it } }
+            .toMap()
+        logger.debug("Got ${issueResource.size} issue resources for entries.")
+
+        val commentResource = feeds.values.flatten()
+            .associateWith { entry ->
+                val matches = githubIssueCommentRegex.find(entry.link)?.groupValues?.let { (_, owner, repo, comment) ->
+                    "$githubAPIEndpoint$owner/$repo/issues/comments/$comment"
+                } ?: return@associateWith null
+                async { requireResource(URL(matches)) }
+            }
+            .mapValues { it.value?.await() }
+            .mapNotNull { (k, v) -> v?.let { k to it } }
+            .toMap()
+        logger.debug("Got ${commentResource.size} comment resources for entries.")
+
         logger.debug("Starting to post messages...")
         for ((botId, botData) in Data.feedData) {
             val bot = Bot.getInstanceOrNull(botId) ?: continue
@@ -149,12 +178,16 @@ object ScaryGitHubFeed : KotlinPlugin(
                     for (entry in entries) {
                         val image = imageResources[entry]
                         val commits = commitsResource[entry]
+                        val issue = issueResource[entry]
+                        val comment = commentResource[entry]
                         postSubscribeMessage(
                             bot,
                             groupId,
                             entry,
                             image,
-                            commits
+                            commits,
+                            issue,
+                            comment
                         )
                     }
                     Data.lastUpdatedTime[githubId] =
@@ -169,6 +202,8 @@ object ScaryGitHubFeed : KotlinPlugin(
         // Cleanup
         imageResources.values.forEach { it.close() }
         commitsResource.values.forEach { it.close() }
+        issueResource.values.forEach { it.close() }
+        commentResource.values.forEach { it.close() }
     }
 
     @OptIn(ExperimentalSerializationApi::class)
@@ -177,7 +212,9 @@ object ScaryGitHubFeed : KotlinPlugin(
         groupId: Long,
         entry: SyndEntry,
         image: ExternalResource? = null,
-        commits: ExternalResource? = null
+        commits: ExternalResource? = null,
+        issue: ExternalResource? = null,
+        comment: ExternalResource? = null,
     ) {
 
         val imageResource = async {
@@ -186,6 +223,18 @@ object ScaryGitHubFeed : KotlinPlugin(
         val commitsResource = async {
             commits?.use { res ->
                 res.inputStream().use { Json.decodeFromStream<JsonObject>(it)["commits"]?.jsonArray }
+            }
+        }
+
+        val issueResource = async {
+            issue?.use { res ->
+                res.inputStream().use { Json.decodeFromStream<JsonObject>(it) }
+            }
+        }
+
+        val commentResource = async {
+            comment?.use { res ->
+                res.inputStream().use { Json.decodeFromStream<JsonObject>(it) }
             }
         }
 
@@ -222,6 +271,48 @@ object ScaryGitHubFeed : KotlinPlugin(
                 appendLine("----------")
             }
         }?.let { messageChain.add(it) }
+
+        issueResource.await()?.let { issueJson ->
+            val title = issueJson["title"]?.jsonPrimitive?.content ?: "无标题"
+            val body = issueJson["body"]?.jsonPrimitive?.content ?: "无内容"
+            val user = issueJson["user"]?.jsonObject ?: return@let buildMessageChain { }
+            val login = user["login"]?.jsonPrimitive?.content ?: "无法获取 issue 创建者"
+            val createdAt = issueJson["created_at"]?.jsonPrimitive?.content ?: "无法获取 issue 创建时间"
+            buildMessageChain {
+                appendLine("issue 信息：")
+                appendLine("Title: $title")
+                appendLine("Content: $body")
+                append(
+                    "（On " + ZonedDateTime
+                        .parse(createdAt, DateTimeFormatter.ISO_DATE_TIME)
+                        .withZoneSameInstant(ZoneId.systemDefault())
+                        .format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM))
+                )
+                appendLine(" by $login）")
+                appendLine("----------")
+            }
+        }?.let { messageChain.add(it) }
+
+        commentResource.await()?.let { commentJson ->
+            val body = commentJson["body"]?.jsonPrimitive?.content ?: "无内容"
+            val user = commentJson["user"]?.jsonObject ?: return@let buildMessageChain { }
+            val login = user["login"]?.jsonPrimitive?.content ?: "无法获取 comment 创建者"
+            val createdAt = commentJson["created_at"]?.jsonPrimitive?.content ?: "无法获取 comment 创建时间"
+            buildMessageChain {
+                appendLine("comment 信息：")
+                appendLine("Content: $body")
+                append(
+                    "（On " + ZonedDateTime
+                        .parse(createdAt, DateTimeFormatter.ISO_DATE_TIME)
+                        .withZoneSameInstant(ZoneId.systemDefault())
+                        .format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM))
+                )
+                appendLine(" by $login）")
+                appendLine("----------")
+            }
+        }?.let {
+            messageChain.add(it)
+        }
 
         messageChain.append("from ScaryGitHubFeed")
 
