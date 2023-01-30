@@ -107,7 +107,10 @@ object ScaryGitHubFeed : KotlinPlugin(
         logger.debug("Got ${feeds.size} feeds for following users: ${feeds.keys.joinToString()}")
 
         // skip if no feeds
-        if (feeds.isEmpty()) return
+        if (feeds.isEmpty()) {
+            logger.info("No feeds to post, skip...")
+            return
+        }
 
         val imageResources = feeds.values.asSequence().flatten()
             .associateWith { entry ->
