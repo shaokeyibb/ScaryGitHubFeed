@@ -14,7 +14,6 @@ import net.mamoe.mirai.console.plugin.jvm.KotlinPlugin
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.utils.ExternalResource
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
-import net.mamoe.mirai.utils.info
 import java.net.InetSocketAddress
 import java.net.Proxy
 import java.net.URL
@@ -81,7 +80,7 @@ object ScaryGitHubFeed : KotlinPlugin(
                     }
                 }
             } catch (e: CancellationException) {
-                logger.info("Post cancelled")
+                logger.debug("Post cancelled")
             }
         }
 
@@ -105,7 +104,7 @@ object ScaryGitHubFeed : KotlinPlugin(
             .mapNotNull { (k, v) -> v?.let { k to it } }
             .toMap()
             .filter { it.value.isNotEmpty() }
-        logger.info("Got ${feeds.size} feeds for following users: ${feeds.keys.joinToString()}")
+        logger.debug("Got ${feeds.size} feeds for following users: ${feeds.keys.joinToString()}")
 
         val imageResources = feeds.values.asSequence().flatten()
             .associateWith { entry ->
@@ -120,7 +119,7 @@ object ScaryGitHubFeed : KotlinPlugin(
             .mapValues { it.value?.await() }
             .mapNotNull { (k, v) -> v?.let { k to it } }
             .toMap()
-        logger.info("Got ${imageResources.size} image resources for entries.")
+        logger.debug("Got ${imageResources.size} image resources for entries.")
 
         val commitsResource = feeds.values.flatten()
             .associateWith { entry ->
@@ -132,15 +131,15 @@ object ScaryGitHubFeed : KotlinPlugin(
             .mapValues { it.value?.await() }
             .mapNotNull { (k, v) -> v?.let { k to it } }
             .toMap()
-        logger.info("Got ${commitsResource.size} commits resources for entries.")
+        logger.debug("Got ${commitsResource.size} commits resources for entries.")
 
-        logger.info("Starting to post messages...")
+        logger.debug("Starting to post messages...")
         for ((botId, botData) in Data.feedData) {
             val bot = Bot.getInstanceOrNull(botId) ?: continue
             for ((groupId, githubIds) in botData) {
                 for (githubId in githubIds) {
                     val entries = feeds[githubId] ?: continue
-                    logger.info("Posting entries for user $githubId in group $groupId by bot $botId")
+                    logger.debug("Posting entries for user $githubId in group $groupId by bot $botId")
                     for (entry in entries) {
                         val image = imageResources[entry]
                         val commits = commitsResource[entry]
@@ -154,7 +153,7 @@ object ScaryGitHubFeed : KotlinPlugin(
                     }
                     Data.lastUpdatedTime[githubId] =
                         (feeds[githubId]?.maxOf { it.publishedDate.time } ?: Date.from(Instant.now()).time).also {
-                            logger.info("Update last updated time for user $githubId from ${Data.lastUpdatedTime[githubId]} to $it")
+                            logger.debug("Update last updated time for user $githubId from ${Data.lastUpdatedTime[githubId]} to $it")
                         }
                 }
             }
@@ -224,12 +223,12 @@ object ScaryGitHubFeed : KotlinPlugin(
     }
 
     private fun requireFeed(githubId: String): List<SyndEntry>? {
-        logger.info("Require feed from $githubId")
+        logger.debug("Require feed from $githubId")
         return try {
             val feed = getFeed(githubId, proxy)
             val lastUpdatedTime = Data.lastUpdatedTime.getOrPut(githubId) { Date.from(Instant.now()).time }
             feed.entries.filter { it.publishedDate.time > lastUpdatedTime }
-                .also { logger.info("Got ${it.size} entries for $githubId") }
+                .also { logger.debug("Got ${it.size} entries for $githubId") }
         } catch (e: Exception) {
             logger.error("Failed to get feed for $githubId", e)
             null
@@ -245,11 +244,11 @@ object ScaryGitHubFeed : KotlinPlugin(
     }
 
     private suspend fun requireResource(url: URL): ExternalResource? {
-        logger.info("Require resource from $url")
+        logger.debug("Require resource from $url")
         return try {
             withContext(Dispatchers.IO) {
                 url.openConnection(proxy).getInputStream().use { it.toExternalResource() }.also {
-                    logger.info { "Resource loaded from $url" }
+                    logger.debug("Resource loaded from $url")
                 }
             }
         } catch (e: Exception) {
