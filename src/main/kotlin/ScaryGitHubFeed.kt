@@ -161,7 +161,7 @@ object ScaryGitHubFeed : KotlinPlugin(
                 }
             }
         }
-        logger.info("Finished posting subscribe message for all feeds")
+        logger.info("Finished posting subscribe message, ${feeds.size} feeds posted.")
 
         // Cleanup
         imageResources.values.forEach { it.close() }
