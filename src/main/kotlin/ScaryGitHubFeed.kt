@@ -106,6 +106,9 @@ object ScaryGitHubFeed : KotlinPlugin(
             .filter { it.value.isNotEmpty() }
         logger.debug("Got ${feeds.size} feeds for following users: ${feeds.keys.joinToString()}")
 
+        // skip if no feeds
+        if (feeds.isEmpty()) return
+
         val imageResources = feeds.values.asSequence().flatten()
             .associateWith { entry ->
                 val matches =
