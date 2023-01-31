@@ -11,6 +11,7 @@ import net.mamoe.mirai.console.permission.PermissionId
 import net.mamoe.mirai.console.permission.PermissionService
 import net.mamoe.mirai.console.plugin.jvm.JvmPluginDescription
 import net.mamoe.mirai.console.plugin.jvm.KotlinPlugin
+import net.mamoe.mirai.contact.getMemberOrFail
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.utils.ExternalResource
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
@@ -316,7 +317,13 @@ object ScaryGitHubFeed : KotlinPlugin(
 
         messageChain.append("from ScaryGitHubFeed")
 
-        bot.sendMessage(groupId, messageChain.build())
+
+        val message = messageChain.build()
+        if (message.toString().length > 500) {
+            bot.sendForwardMessage(groupId, message)
+        } else {
+            bot.sendMessage(groupId, message)
+        }
     }
 
     private fun requireFeed(githubId: String): List<SyndEntry>? {
@@ -332,7 +339,31 @@ object ScaryGitHubFeed : KotlinPlugin(
         }
     }
 
-    private suspend fun Bot.sendMessage(groupId: Long, message: MessageChain) {
+    private suspend fun Bot.sendForwardMessage(groupId: Long, message: Message) {
+        val group = getGroup(groupId) ?: return
+        message.toForwardMessage(
+            sender = group.getMemberOrFail(bot.id),
+            displayStrategy = object : ForwardMessage.DisplayStrategy {
+                override fun generateTitle(forward: RawForwardMessage): String {
+                    return "ScaryGitHubFeed 订阅推送"
+                }
+
+                override fun generateBrief(forward: RawForwardMessage): String {
+                    return "[GitHub 订阅推送]"
+                }
+
+                override fun generateSource(forward: RawForwardMessage): String {
+                    return "GitHub 订阅推送"
+                }
+
+                override fun generateSummary(forward: RawForwardMessage): String {
+                    return "查看详细订阅推送信息"
+                }
+            }
+        ).also { group.sendMessage(it) }
+    }
+
+    private suspend fun Bot.sendMessage(groupId: Long, message: Message) {
         getGroup(groupId)?.sendMessage(message)
     }
 
