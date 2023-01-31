@@ -240,12 +240,12 @@ object ScaryGitHubFeed : KotlinPlugin(
         }
 
         val messageChain = MessageChainBuilder().apply {
-            appendLine("GitHub Feed 订阅推送 \uD83D\uDE31\uD83D\uDE31\uD83D\uDE31\uD83D\uDE31\uD83D\uDE31")
+            appendLine("GitHub Feed 订阅推送 \uD83D\uDE31\uD83D\uDE31\uD83D\uDE31\uD83D\uDE31")
             appendLine(entry.title)
             appendLine("时间：" + SimpleDateFormat.getDateTimeInstance().format(entry.publishedDate))
         }
 
-        imageResource.await()?.let { messageChain.add(it) }?.let { messageChain.appendLine("无法加载图片") }
+        imageResource.await().let { if (it == null) messageChain.appendLine("无法加载图片") else messageChain.add(it) }
         messageChain.appendLine(entry.link)
         messageChain.appendLine("----------")
 
