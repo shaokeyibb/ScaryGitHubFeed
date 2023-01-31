@@ -45,6 +45,11 @@ val githubIssueRegex = Regex("^https://github\\.com/([a-zA-Z0-9\\-]+?)/([a-zA-Z0
 val githubIssueCommentRegex =
     Regex("^https://github\\.com/([a-zA-Z0-9\\-]+?)/([a-zA-Z0-9\\-_.]+?)/issues/\\d+#issuecomment-(\\d+)\$")
 
+val githubPullRequestRegex = Regex("^https://github\\.com/([a-zA-Z0-9\\-]+?)/([a-zA-Z0-9\\-_.]+?)/pull/(\\d+)\$")
+
+val githubPullRequestCommentRegex =
+    Regex("^https://github\\.com/([a-zA-Z0-9\\-]+?)/([a-zA-Z0-9\\-_.]+?)/pull/\\d+#discussion_r(\\d+)\$")
+
 const val githubAPIEndpoint = "https://api.github.com/repos/"
 
 val proxy: Proxy = if (Config.proxyHost.isNotBlank() && Config.proxyPort > 0) {
@@ -157,7 +162,7 @@ object ScaryGitHubFeed : KotlinPlugin(
             .toMap()
         logger.debug("Got ${issueResource.size} issue resources for entries.")
 
-        val commentResource = feeds.values.flatten()
+        val issueCommentsResource = feeds.values.flatten()
             .associateWith { entry ->
                 val matches = githubIssueCommentRegex.find(entry.link)?.groupValues?.let { (_, owner, repo, comment) ->
                     "$githubAPIEndpoint$owner/$repo/issues/comments/$comment"
@@ -167,7 +172,32 @@ object ScaryGitHubFeed : KotlinPlugin(
             .mapValues { it.value?.await() }
             .mapNotNull { (k, v) -> v?.let { k to it } }
             .toMap()
-        logger.debug("Got ${commentResource.size} comment resources for entries.")
+        logger.debug("Got ${issueCommentsResource.size} comment resources for entries.")
+
+        val pullRequestResource = feeds.values.flatten()
+            .associateWith { entry ->
+                val matches = githubPullRequestRegex.find(entry.link)?.groupValues?.let { (_, owner, repo, pr) ->
+                    "$githubAPIEndpoint$owner/$repo/pulls/$pr"
+                } ?: return@associateWith null
+                async { requireResource(URL(matches)) }
+            }
+            .mapValues { it.value?.await() }
+            .mapNotNull { (k, v) -> v?.let { k to it } }
+            .toMap()
+        logger.debug("Got ${pullRequestResource.size} pull request resources for entries.")
+
+        val pullRequestCommentResource = feeds.values.flatten()
+            .associateWith { entry ->
+                val matches =
+                    githubPullRequestCommentRegex.find(entry.link)?.groupValues?.let { (_, owner, repo, comment) ->
+                        "$githubAPIEndpoint$owner/$repo/pulls/comments/$comment"
+                    } ?: return@associateWith null
+                async { requireResource(URL(matches)) }
+            }
+            .mapValues { it.value?.await() }
+            .mapNotNull { (k, v) -> v?.let { k to it } }
+            .toMap()
+        logger.debug("Got ${pullRequestCommentResource.size} pull request comment resources for entries.")
 
         logger.debug("Starting to post messages...")
         for ((botId, botData) in Data.feedData) {
@@ -180,7 +210,9 @@ object ScaryGitHubFeed : KotlinPlugin(
                         val image = imageResources[entry]
                         val commits = commitsResource[entry]
                         val issue = issueResource[entry]
-                        val comment = commentResource[entry]
+                        val issueComment = issueCommentsResource[entry]
+                        val pullRequest = pullRequestResource[entry]
+                        val pullRequestComment = pullRequestCommentResource[entry]
                         postSubscribeMessage(
                             bot,
                             groupId,
@@ -188,7 +220,9 @@ object ScaryGitHubFeed : KotlinPlugin(
                             image,
                             commits,
                             issue,
-                            comment
+                            issueComment,
+                            pullRequest,
+                            pullRequestComment
                         )
                     }
                     Data.lastUpdatedTime[githubId] =
@@ -204,7 +238,9 @@ object ScaryGitHubFeed : KotlinPlugin(
         imageResources.values.forEach { it.close() }
         commitsResource.values.forEach { it.close() }
         issueResource.values.forEach { it.close() }
-        commentResource.values.forEach { it.close() }
+        issueCommentsResource.values.forEach { it.close() }
+        pullRequestResource.values.forEach { it.close() }
+        pullRequestCommentResource.values.forEach { it.close() }
     }
 
     @OptIn(ExperimentalSerializationApi::class)
@@ -215,29 +251,26 @@ object ScaryGitHubFeed : KotlinPlugin(
         image: ExternalResource? = null,
         commits: ExternalResource? = null,
         issue: ExternalResource? = null,
-        comment: ExternalResource? = null,
+        issueComment: ExternalResource? = null,
+        pullRequest: ExternalResource? = null,
+        pullRequestComment: ExternalResource? = null,
     ) {
 
         val imageResource = async {
             image?.use { bot.uploadImage(groupId, it) }
         }
-        val commitsResource = async {
-            commits?.use { res ->
-                res.inputStream().use { Json.decodeFromStream<JsonObject>(it)["commits"]?.jsonArray }
-            }
+
+        val commitsResource = useDeferredResource(commits) { resource ->
+            resource.inputStream().use { Json.decodeFromStream<JsonObject>(it)["commits"]?.jsonArray }
         }
 
-        val issueResource = async {
-            issue?.use { res ->
-                res.inputStream().use { Json.decodeFromStream<JsonObject>(it) }
-            }
-        }
+        val issueResource = useDeferredResource<JsonObject?>(issue)
 
-        val commentResource = async {
-            comment?.use { res ->
-                res.inputStream().use { Json.decodeFromStream<JsonObject>(it) }
-            }
-        }
+        val issueCommentResource = useDeferredResource<JsonObject?>(issueComment)
+
+        val pullRequestResource = useDeferredResource<JsonObject?>(pullRequest)
+
+        val pullRequestCommentResource = useDeferredResource<JsonObject?>(pullRequestComment)
 
         val messageChain = MessageChainBuilder().apply {
             appendLine("GitHub Feed 订阅推送 \uD83D\uDE31\uD83D\uDE31\uD83D\uDE31\uD83D\uDE31")
@@ -294,13 +327,55 @@ object ScaryGitHubFeed : KotlinPlugin(
             }
         }?.let { messageChain.add(it) }
 
-        commentResource.await()?.let { commentJson ->
+        issueCommentResource.await()?.let { commentJson ->
             val body = commentJson["body"]?.jsonPrimitive?.content ?: "无内容"
             val user = commentJson["user"]?.jsonObject ?: return@let buildMessageChain { }
             val login = user["login"]?.jsonPrimitive?.content ?: "无法获取 comment 创建者"
             val createdAt = commentJson["created_at"]?.jsonPrimitive?.content ?: "无法获取 comment 创建时间"
             buildMessageChain {
-                appendLine("comment 信息：")
+                appendLine("issue comment 信息：")
+                appendLine("Content: $body")
+                append(
+                    "（On " + ZonedDateTime
+                        .parse(createdAt, DateTimeFormatter.ISO_DATE_TIME)
+                        .withZoneSameInstant(ZoneId.systemDefault())
+                        .format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM))
+                )
+                appendLine(" by $login）")
+                appendLine("----------")
+            }
+        }?.let {
+            messageChain.add(it)
+        }
+
+        pullRequestResource.await()?.let { pullRequestJson ->
+            val title = pullRequestJson["title"]?.jsonPrimitive?.content ?: "无标题"
+            val body = pullRequestJson["body"]?.jsonPrimitive?.content ?: "无内容"
+            val user = pullRequestJson["user"]?.jsonObject ?: return@let buildMessageChain { }
+            val login = user["login"]?.jsonPrimitive?.content ?: "无法获取 pull request 创建者"
+            val createdAt = pullRequestJson["created_at"]?.jsonPrimitive?.content ?: "无法获取 pull request 创建时间"
+            buildMessageChain {
+                appendLine("pull request 信息：")
+                appendLine("Title: $title")
+                appendLine("Content: $body")
+                append(
+                    "（On " + ZonedDateTime
+                        .parse(createdAt, DateTimeFormatter.ISO_DATE_TIME)
+                        .withZoneSameInstant(ZoneId.systemDefault())
+                        .format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM))
+                )
+                appendLine(" by $login）")
+                appendLine("----------")
+            }
+        }?.let { messageChain.add(it) }
+
+        pullRequestCommentResource.await()?.let { commentJson ->
+            val body = commentJson["body"]?.jsonPrimitive?.content ?: "无内容"
+            val user = commentJson["user"]?.jsonObject ?: return@let buildMessageChain { }
+            val login = user["login"]?.jsonPrimitive?.content ?: "无法获取 comment 创建者"
+            val createdAt = commentJson["created_at"]?.jsonPrimitive?.content ?: "无法获取 comment 创建时间"
+            buildMessageChain {
+                appendLine("pull request comment 信息：")
                 appendLine("Content: $body")
                 append(
                     "（On " + ZonedDateTime
@@ -369,6 +444,20 @@ object ScaryGitHubFeed : KotlinPlugin(
 
     private suspend fun Bot.uploadImage(groupId: Long, resource: ExternalResource): Image? {
         return resource.use { getGroup(groupId)?.uploadImage(it) }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private inline fun <reified T> useDeferredResource(
+        externalResource: ExternalResource?,
+        crossinline use: (ExternalResource) -> T? = { resource ->
+            resource.inputStream().use { Json.decodeFromStream(it) }
+        }
+    ): Deferred<T?> {
+        return async {
+            externalResource?.use { res ->
+                use.invoke(res)
+            }
+        }
     }
 
     private suspend fun requireResource(url: URL): ExternalResource? {
