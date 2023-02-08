@@ -288,10 +288,10 @@ object ScaryGitHubFeed : KotlinPlugin(
                 for (json in commitJson) {
                     val sha = json.jsonObject["sha"]?.jsonPrimitive?.content ?: continue
                     val commit = json.jsonObject["commit"] ?: continue
-                    val message = commit.jsonObject["message"]?.jsonPrimitive?.content ?: continue
+                    val message = commit.jsonObject["message"]?.jsonPrimitive?.content ?: "无法获得 commit 消息"
                     val author = commit.jsonObject["author"] ?: continue
                     val date = author.jsonObject["date"]?.jsonPrimitive?.content ?: continue
-                    val name = author.jsonObject["name"]?.jsonPrimitive?.content ?: continue
+                    val name = author.jsonObject["name"]?.jsonPrimitive?.content ?: "无法获取 commit 创建者"
                     appendLine(
                         "- commit#" + sha.substring(sha.length - 6, sha.length) + ": "
                                 + message
@@ -307,11 +307,11 @@ object ScaryGitHubFeed : KotlinPlugin(
         }?.let { messageChain.add(it) }
 
         issueResource.await()?.let { issueJson ->
-            val title = issueJson["title"]?.jsonPrimitive?.content ?: "无标题"
-            val body = issueJson["body"]?.jsonPrimitive?.content ?: "无内容"
+            val title = issueJson["title"]?.jsonPrimitive?.content.checkNull() ?: "无标题"
+            val body = issueJson["body"]?.jsonPrimitive?.content.checkNull() ?: "无内容"
             val user = issueJson["user"]?.jsonObject ?: return@let buildMessageChain { }
-            val login = user["login"]?.jsonPrimitive?.content ?: "无法获取 issue 创建者"
-            val createdAt = issueJson["created_at"]?.jsonPrimitive?.content ?: "无法获取 issue 创建时间"
+            val login = user["login"]?.jsonPrimitive?.content.checkNull() ?: "无法获取 issue 创建者"
+            val createdAt = issueJson["created_at"]?.jsonPrimitive?.content.checkNull() ?: "无法获取 issue 创建时间"
             buildMessageChain {
                 appendLine("issue 信息：")
                 appendLine("Title: $title")
@@ -328,10 +328,10 @@ object ScaryGitHubFeed : KotlinPlugin(
         }?.let { messageChain.add(it) }
 
         issueCommentResource.await()?.let { commentJson ->
-            val body = commentJson["body"]?.jsonPrimitive?.content ?: "无内容"
+            val body = commentJson["body"]?.jsonPrimitive?.content.checkNull() ?: "无内容"
             val user = commentJson["user"]?.jsonObject ?: return@let buildMessageChain { }
-            val login = user["login"]?.jsonPrimitive?.content ?: "无法获取 comment 创建者"
-            val createdAt = commentJson["created_at"]?.jsonPrimitive?.content ?: "无法获取 comment 创建时间"
+            val login = user["login"]?.jsonPrimitive?.content.checkNull() ?: "无法获取 comment 创建者"
+            val createdAt = commentJson["created_at"]?.jsonPrimitive?.content.checkNull()?: "无法获取 comment 创建时间"
             buildMessageChain {
                 appendLine("issue comment 信息：")
                 appendLine("Content: $body")
@@ -349,11 +349,11 @@ object ScaryGitHubFeed : KotlinPlugin(
         }
 
         pullRequestResource.await()?.let { pullRequestJson ->
-            val title = pullRequestJson["title"]?.jsonPrimitive?.content ?: "无标题"
-            val body = pullRequestJson["body"]?.jsonPrimitive?.content ?: "无内容"
+            val title = pullRequestJson["title"]?.jsonPrimitive?.content.checkNull() ?: "无标题"
+            val body = pullRequestJson["body"]?.jsonPrimitive?.content.checkNull() ?: "无内容"
             val user = pullRequestJson["user"]?.jsonObject ?: return@let buildMessageChain { }
-            val login = user["login"]?.jsonPrimitive?.content ?: "无法获取 pull request 创建者"
-            val createdAt = pullRequestJson["created_at"]?.jsonPrimitive?.content ?: "无法获取 pull request 创建时间"
+            val login = user["login"]?.jsonPrimitive?.content.checkNull() ?: "无法获取 pull request 创建者"
+            val createdAt = pullRequestJson["created_at"]?.jsonPrimitive?.content.checkNull() ?: "无法获取 pull request 创建时间"
             buildMessageChain {
                 appendLine("pull request 信息：")
                 appendLine("Title: $title")
@@ -370,10 +370,10 @@ object ScaryGitHubFeed : KotlinPlugin(
         }?.let { messageChain.add(it) }
 
         pullRequestCommentResource.await()?.let { commentJson ->
-            val body = commentJson["body"]?.jsonPrimitive?.content ?: "无内容"
+            val body = commentJson["body"]?.jsonPrimitive?.content.checkNull() ?: "无内容"
             val user = commentJson["user"]?.jsonObject ?: return@let buildMessageChain { }
-            val login = user["login"]?.jsonPrimitive?.content ?: "无法获取 comment 创建者"
-            val createdAt = commentJson["created_at"]?.jsonPrimitive?.content ?: "无法获取 comment 创建时间"
+            val login = user["login"]?.jsonPrimitive?.content.checkNull() ?: "无法获取 comment 创建者"
+            val createdAt = commentJson["created_at"]?.jsonPrimitive?.content.checkNull() ?: "无法获取 comment 创建时间"
             buildMessageChain {
                 appendLine("pull request comment 信息：")
                 appendLine("Content: $body")
@@ -436,6 +436,10 @@ object ScaryGitHubFeed : KotlinPlugin(
                 }
             }
         ).also { group.sendMessage(it) }
+    }
+
+    private fun String?.checkNull(): String? {
+        return this?.takeIf { it != "null" }
     }
 
     private suspend fun Bot.sendMessage(groupId: Long, message: Message) {
