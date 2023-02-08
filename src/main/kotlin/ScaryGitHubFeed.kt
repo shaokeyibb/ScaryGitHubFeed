@@ -40,12 +40,12 @@ const val githubGraphLinkPrefix =
 val githubCompareRegex =
     Regex("^https://github\\.com/([a-zA-Z0-9\\-]+?)/([a-zA-Z0-9\\-_.]+?)/compare/([a-z0-9]{10})...([a-z0-9]{10})\$")
 
-val githubIssueRegex = Regex("^https://github\\.com/([a-zA-Z0-9\\-]+?)/([a-zA-Z0-9\\-_.]+?)/issues/(\\d+)\$")
+val githubIssueRegex = Regex("^https://github\\.com/([a-zA-Z0-9\\-]+?)/([a-zA-Z0-9\\-_.]+?)/issues/(\\d+)")
 
 val githubIssueCommentRegex =
     Regex("^https://github\\.com/([a-zA-Z0-9\\-]+?)/([a-zA-Z0-9\\-_.]+?)/issues/\\d+#issuecomment-(\\d+)\$")
 
-val githubPullRequestRegex = Regex("^https://github\\.com/([a-zA-Z0-9\\-]+?)/([a-zA-Z0-9\\-_.]+?)/pull/(\\d+)\$")
+val githubPullRequestRegex = Regex("^https://github\\.com/([a-zA-Z0-9\\-]+?)/([a-zA-Z0-9\\-_.]+?)/pull/(\\d+)")
 
 val githubPullRequestCommentRegex =
     Regex("^https://github\\.com/([a-zA-Z0-9\\-]+?)/([a-zA-Z0-9\\-_.]+?)/pull/\\d+#discussion_r(\\d+)\$")
