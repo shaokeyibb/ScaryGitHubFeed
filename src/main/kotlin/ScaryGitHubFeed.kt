@@ -50,6 +50,9 @@ val githubPullRequestRegex = Regex("^https://github\\.com/([a-zA-Z0-9\\-]+?)/([a
 val githubPullRequestCommentRegex =
     Regex("^https://github\\.com/([a-zA-Z0-9\\-]+?)/([a-zA-Z0-9\\-_.]+?)/pull/\\d+#discussion_r(\\d+)\$")
 
+val githubPullRequestCommentRegex2 =
+    Regex("^https://github\\.com/([a-zA-Z0-9\\-]+?)/([a-zA-Z0-9\\-_.]+?)/pull/\\d+#issuecomment-(\\d+)\$")
+
 const val githubAPIEndpoint = "https://api.github.com/repos/"
 
 val proxy: Proxy = if (Config.proxyHost.isNotBlank() && Config.proxyPort > 0) {
@@ -152,7 +155,8 @@ object ScaryGitHubFeed : KotlinPlugin(
 
         val issueResource = feeds.values.flatten()
             .associateWith { entry ->
-                val matches = githubIssueRegex.find(entry.link)?.groupValues?.let { (_, owner, repo, issue) ->
+                val matches = (githubIssueRegex.find(entry.link)
+                    ?: githubPullRequestCommentRegex2.find(entry.link))?.groupValues?.let { (_, owner, repo, issue) ->
                     "$githubAPIEndpoint$owner/$repo/issues/$issue"
                 } ?: return@associateWith null
                 async { requireResource(URL(matches)) }
@@ -331,7 +335,7 @@ object ScaryGitHubFeed : KotlinPlugin(
             val body = commentJson["body"]?.jsonPrimitive?.content.checkNull() ?: "无内容"
             val user = commentJson["user"]?.jsonObject ?: return@let buildMessageChain { }
             val login = user["login"]?.jsonPrimitive?.content.checkNull() ?: "无法获取 comment 创建者"
-            val createdAt = commentJson["created_at"]?.jsonPrimitive?.content.checkNull()?: "无法获取 comment 创建时间"
+            val createdAt = commentJson["created_at"]?.jsonPrimitive?.content.checkNull() ?: "无法获取 comment 创建时间"
             buildMessageChain {
                 appendLine("issue comment 信息：")
                 appendLine("Content: $body")
@@ -353,7 +357,8 @@ object ScaryGitHubFeed : KotlinPlugin(
             val body = pullRequestJson["body"]?.jsonPrimitive?.content.checkNull() ?: "无内容"
             val user = pullRequestJson["user"]?.jsonObject ?: return@let buildMessageChain { }
             val login = user["login"]?.jsonPrimitive?.content.checkNull() ?: "无法获取 pull request 创建者"
-            val createdAt = pullRequestJson["created_at"]?.jsonPrimitive?.content.checkNull() ?: "无法获取 pull request 创建时间"
+            val createdAt =
+                pullRequestJson["created_at"]?.jsonPrimitive?.content.checkNull() ?: "无法获取 pull request 创建时间"
             buildMessageChain {
                 appendLine("pull request 信息：")
                 appendLine("Title: $title")
