@@ -208,7 +208,7 @@ object ScaryGitHubFeed : KotlinPlugin(
             val bot = Bot.getInstanceOrNull(botId) ?: continue
             for ((groupId, githubIds) in botData) {
                 for (githubId in githubIds) {
-                    val entries = feeds[githubId] ?: continue
+                    val entries = feeds[githubId]?.sortedBy { it.publishedDate } ?: continue
                     logger.debug("Posting entries for user $githubId in group $groupId by bot $botId")
                     for (entry in entries) {
                         val image = imageResources[entry]
