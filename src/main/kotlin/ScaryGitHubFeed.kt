@@ -282,7 +282,7 @@ object ScaryGitHubFeed : KotlinPlugin(
             appendLine("时间：" + SimpleDateFormat.getDateTimeInstance().format(entry.publishedDate))
         }
 
-        imageResource.await().let { if (it == null) messageChain.appendLine("无法加载图片") else messageChain.add(it) }
+        imageResource.await()?.let{ messageChain.add(it) }
         messageChain.appendLine(entry.link)
         messageChain.appendLine("----------")
 
