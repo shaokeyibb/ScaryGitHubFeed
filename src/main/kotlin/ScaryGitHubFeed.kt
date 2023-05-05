@@ -37,6 +37,12 @@ val githubRepoRegex = Regex("^https://github\\.com/([a-zA-Z0-9\\-]+?)/([a-zA-Z0-
 const val githubGraphLinkPrefix =
     "https://opengraph.githubassets.com/31593820a09d4aa76a2b7f30a7efd993982cb622b3607ab21a852c5397bcdde0/"
 
+const val githubIssuesGraphLinkPrefix =
+    "https://opengraph.githubassets.com/9bef4fb17e0392ec65224d4c0bc28a579e7ce5e04e30dbc944dd48cc31554c14/"
+
+const val githubPullGraphLinkPrefix =
+    "https://opengraph.githubassets.com/f09dd134df47025782b66b558b2c3176673c2960938f28ca659c32997eac7680/"
+
 val githubCompareRegex =
     Regex("^https://github\\.com/([a-zA-Z0-9\\-]+?)/([a-zA-Z0-9\\-_.]+?)/compare/([a-z0-9]{10})...([a-z0-9]{10})\$")
 
@@ -128,6 +134,14 @@ object ScaryGitHubFeed : KotlinPlugin(
 
         val imageResources = feeds.values.asSequence().flatten()
             .associateWith { entry ->
+                githubIssueRegex.find(entry.link)?.groupValues?.let { (_, user, repo, issue) -> "$user/$repo/issues/$issue" }
+                    ?.let { matches ->
+                        return@associateWith async { requireResource(URL(githubIssuesGraphLinkPrefix + matches)) }
+                    }
+                githubPullRequestRegex.find(entry.link)?.groupValues?.let { (_, user, repo, pull) -> "$user/$repo/pull/$pull" }
+                    ?.let { matches ->
+                        return@associateWith async { requireResource(URL(githubPullGraphLinkPrefix + matches)) }
+                    }
                 val matches =
                     githubRepoRegex.find(entry.link)?.groupValues?.let { (_, user, repo) -> "$user/$repo" }
                         ?: return@associateWith let {
@@ -282,7 +296,7 @@ object ScaryGitHubFeed : KotlinPlugin(
             appendLine("时间：" + SimpleDateFormat.getDateTimeInstance().format(entry.publishedDate))
         }
 
-        imageResource.await()?.let{ messageChain.add(it) }
+        imageResource.await()?.let { messageChain.add(it) }
         messageChain.appendLine(entry.link)
         messageChain.appendLine("----------")
 
